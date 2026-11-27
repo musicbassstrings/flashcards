@@ -282,7 +282,7 @@ textarea.input { resize: vertical; min-height: 96px; line-height: 1.4; }
 .dunk-clue-text { font-size: 18px; font-weight: 650; line-height: 1.3; }
 .dunk-stage { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: -6px 0 0; }
 .dunk-art { display: flex; justify-content: center; }
-.dunk-svg { height: 21vh; max-height: 170px; min-height: 120px; width: auto; overflow: visible; }
+.dunk-svg { height: 19vh; max-height: 160px; min-height: 110px; width: auto; overflow: visible; }
 .tank-back { fill: #DDE8F0; } .water { fill: #5DADE2; opacity: .55; }
 .water-front { fill: #3A93D6; opacity: .42; pointer-events: none; }
 .tank-front { fill: none; stroke: #8795A1; stroke-width: 3; }
@@ -319,22 +319,30 @@ textarea.input { resize: vertical; min-height: 96px; line-height: 1.4; }
 .balls { display: flex; justify-content: center; gap: 7px; }
 .balls .b { width: 14px; height: 14px; border-radius: 50%; background: #F4C430; box-shadow: inset 0 0 0 1.5px #C99A00; }
 .balls .b.used { background: transparent; box-shadow: inset 0 0 0 1.5px var(--line); }
-.puzzle { text-align: center; font-size: 26px; font-weight: 750; line-height: 1.9; padding: 4px 0; }
-.puzzle.ctx { font-size: 17px; font-weight: 450; line-height: 2.1; text-align: left; background: var(--card); border-radius: 16px; padding: 10px 14px; box-shadow: var(--shadow); }
+.puzzle { text-align: center; font-size: 24px; font-weight: 750; line-height: 1.5; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.puzzle.ctx { font-size: 16px; font-weight: 450; line-height: 1.45; text-align: left; }
+.puzzle.ctx.long { font-size: 15px; line-height: 1.4; }
+.puzzle.ctx.long .slot { font-size: 15px; }
+.dunk-dock {
+  position: sticky; bottom: 0; z-index: 4; display: flex; flex-direction: column; gap: 8px;
+  margin: 0 -16px calc(-28px - env(safe-area-inset-bottom)); padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.dunk-dock .kb { margin: 0 -6px; }
+.dunk-dock .btn { min-height: 42px; padding: 9px 16px; }
 .pw { display: inline-block; white-space: nowrap; }
-.slot { display: inline-block; min-width: .78em; margin: 0 1.5px; border-bottom: 3px solid var(--text); text-align: center; line-height: 1.25; text-transform: uppercase; }
-.puzzle.ctx .slot { font-weight: 750; font-size: 19px; border-bottom-width: 2.5px; }
+.slot { display: inline-block; min-width: .78em; margin: 0 1.5px; border-bottom: 3px solid var(--text); text-align: center; line-height: 1.15; text-transform: uppercase; }
+.puzzle.ctx .slot { font-weight: 750; font-size: 16px; min-width: .72em; margin: 0 1px; border-bottom-width: 2px; line-height: 1.1; }
 .slot.shown { border-color: var(--ok); color: var(--ok); }
 .slot.missed { border-color: var(--bad); color: var(--bad); }
 .fixed { font-weight: 750; }
 .ctx-ch { color: var(--muted); }
 .dunk-msg { text-align: center; color: var(--muted); font-size: 14px; }
-.dunk-stage + .puzzle { margin-top: -4px; }
-.puzzle.ctx { font-size: 16px; line-height: 2; padding: 8px 12px; }
 .ok-text { color: var(--ok); font-size: 18px; } .bad-text { color: var(--blue); font-size: 18px; letter-spacing: .05em; }
 .kb { display: flex; flex-direction: column; gap: 6px; margin: 0 -10px; }
 .kb-row { display: flex; justify-content: center; gap: 4px; }
-.kb.done { opacity: .5; pointer-events: none; }
+.kb.done { display: none; }
 .key {
   border: 0; height: 38px; flex: 0 1 34px; min-width: 0; padding: 0; border-radius: 7px; background: var(--card);
   box-shadow: 0 1px 0 rgba(0,0,0,.18), inset 0 0 0 1px var(--line); font-weight: 650; font-size: 17px;
@@ -382,7 +390,7 @@ textarea.input { resize: vertical; min-height: 96px; line-height: 1.4; }
 @keyframes chomp { 50% { transform: scaleY(.1); } }
 @keyframes hurt { 20%, 60% { transform: translateX(-6px) rotate(-8deg); } 40%, 80% { transform: translateX(6px) rotate(8deg); } }
 .chomp-area { display: flex; flex-direction: column; gap: 10px; }
-.chomp-sentence { background: var(--card); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); font-size: 18px; line-height: 1.6; white-space: pre-wrap; }
+.chomp-sentence { background: var(--card); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); font-size: 17px; line-height: 1.5; white-space: pre-wrap; }
 .chomp-sentence.whole { text-align: center; }
 .blank { display: inline-block; min-width: 4.5em; border-bottom: 3px solid var(--primary); text-align: center; font-weight: 750; padding: 0 4px; line-height: 1.3; }
 .blank.ok { color: var(--ok); border-color: var(--ok); } .blank.bad { color: var(--bad); border-color: var(--bad); }

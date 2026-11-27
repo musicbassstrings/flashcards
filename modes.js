@@ -654,20 +654,11 @@ MODES.dunk = function () {
     const svg = art.firstElementChild;
     const balls = h('div', { class: 'balls', 'aria-label': 'Balls thrown' });
     const paintBalls = () => balls.replaceChildren(...Array.from({ length: DUNK_MAX }, (_, i) => h('span', { class: 'b' + (i < misses ? ' used' : '') })));
-    const puzzle = h('div', { class: 'puzzle' + (pz.whole ? '' : ' ctx') });
-    // For long answers, show only a few words on each side of the blank.
-    let winA = 0, winB = pz.text.length;
-    if (!pz.whole) {
-      winA = Math.max(0, pz.start - 50); winB = Math.min(pz.text.length, pz.end + 50);
-      if (winA > 0) { const sp = pz.text.indexOf(' ', winA); winA = sp >= 0 && sp < pz.start ? sp + 1 : pz.start; }
-      if (winB < pz.text.length) { const sp = pz.text.lastIndexOf(' ', winB); winB = sp > pz.end ? sp : pz.end; }
-    }
+    const puzzle = h('div', { class: 'puzzle' + (pz.whole ? '' : ' ctx') + (pz.text.length > 300 ? ' long' : '') });
     function paintPuzzle() {
       const parts = []; let i = 0;
-      if (winA > 0) parts.push(h('span', { class: 'ctx-ch' }, '… '));
       for (const tok of pz.text.split(/(\s+)/)) {
         if (!tok) continue;
-        if (i + tok.length <= winA || i >= winB) { i += tok.length; continue; }
         if (/^\s+$/.test(tok)) { parts.push(' '); i += tok.length; continue; }
         const word = h('span', { class: 'pw' });
         for (const ch of tok) {
@@ -679,7 +670,6 @@ MODES.dunk = function () {
         }
         parts.push(word);
       }
-      if (winB < pz.text.length) parts.push(h('span', { class: 'ctx-ch' }, ' …'));
       puzzle.replaceChildren(...parts);
     }
     const msg = h('p', { class: 'dunk-msg' }, `Guess the ${pz.whole ? 'answer' : 'missing word'} one letter at a time. ${DUNK_MAX} misses and he gets dunked!`);
@@ -745,15 +735,23 @@ MODES.dunk = function () {
     }
     // Make sure the tank is on screen when he cheers or goes in the water.
     function showArt() {
-      const r = art.getBoundingClientRect();
-      if (r.top < 60 || r.bottom > window.innerHeight) art.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      kb.classList.add('done'); // the keyboard folds away when the round ends
+      requestAnimationFrame(() => {
+        const r = art.getBoundingClientRect(), dock = kb.parentNode.getBoundingClientRect();
+        const limit = Math.min(window.innerHeight, dock.top) - 8;
+        if (r.bottom > limit) window.scrollBy({ top: r.bottom - limit, behavior: 'smooth' });
+        else if (r.top < 60) window.scrollBy({ top: r.top - 60, behavior: 'smooth' });
+      });
     }
     guessFn = guess;
     paintBalls(); paintPuzzle();
+    // Question and answer-with-blank share one card above the tank; the keyboard sits below it.
     s.set([
       h('div', { class: 'prompt dunk-clue' }, h('div', { class: 'prompt-top' }, catTag(c), h('span', { class: 'grow' }), speakBtn(pz.clue), starBtn(c.id)),
-        h('div', { class: 'prompt-text dunk-clue-text' }, pz.clue)),
-      h('div', { class: 'dunk-stage' }, art, balls), puzzle, msg, kb, actions,
+        h('div', { class: 'prompt-text dunk-clue-text' }, pz.clue),
+        puzzle),
+      h('div', { class: 'dunk-stage' }, art, balls), msg,
+      h('div', { class: 'dunk-dock' }, kb, actions),
       best ? h('p', { class: 'muted center small' }, `Best run: ${best} in a row`) : null]);
   }
   game();
@@ -904,9 +902,7 @@ function pickBlank(card, bank) {
     if (ds.length >= 3) break;
   }
   if (!ds.length) return whole();
-  let before = toks.slice(0, pc.i).join('') + pc.lead, after = pc.tail + toks.slice(pc.i + 1).join('');
-  if (before.length > 70) before = '… ' + before.slice(before.indexOf(' ', before.length - 70) + 1);
-  if (after.length > 70) after = after.slice(0, after.lastIndexOf(' ', 70)) + ' …';
+  const before = toks.slice(0, pc.i).join('') + pc.lead, after = pc.tail + toks.slice(pc.i + 1).join('');
   return { clue: front, before, after, answer, whole: false, choices: shuffle([answer].concat(ds)) };
 }
 
