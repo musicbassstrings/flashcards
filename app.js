@@ -85,10 +85,15 @@ const ICONS = {
   left: 'M15 5l-7 7 7 7',
   right: 'M9 5l7 7-7 7',
   bulb: 'M9 18h6 M10 21h4 M12 3a6 6 0 00-4 10.5c.8.8 1 1.6 1 2.5h6c0-.9.2-1.7 1-2.5A6 6 0 0012 3z',
+  fish: 'M3 12c3.5-5 10-6.5 15-2.5L21 7v10l-3-2.5C13 18.5 6.5 17 3 12z M14.5 11h.01',
+  headphones: 'M4 15v-3a8 8 0 0116 0v3 M4 15h3.5v5H5.5A1.5 1.5 0 014 18.5V15z M20 15h-3.5v5h2a1.5 1.5 0 001.5-1.5V15z',
+  play: 'M8 5.5v13l10.5-6.5z',
+  pause: 'M7 5h3.5v14H7z M13.5 5H17v14h-3.5z',
 };
+const FILLED_ICONS = { starFill: 'star', play: 'play', pause: 'pause' };
 function icon(name) {
-  const filled = name === 'starFill';
-  const d = ICONS[filled ? 'star' : name] || '';
+  const filled = name in FILLED_ICONS;
+  const d = ICONS[FILLED_ICONS[name] || name] || '';
   return h('span', { class: 'ico', 'aria-hidden': 'true', html:
     `<svg viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>` });
 }
@@ -556,7 +561,9 @@ const MODE_LIST = [
   { id: 'test', name: 'Test', desc: 'Scored practice test', icon: 'clipboard' },
   { id: 'match', name: 'Match', desc: 'Race the clock', icon: 'grid' },
   { id: 'dunk', name: 'Dunk Tank', desc: 'Guess letters, stay dry', icon: 'drop' },
+  { id: 'chomp', name: 'Hungry Fish', desc: 'Fill the blank, feed the fish', icon: 'fish' },
   { id: 'memorize', name: 'Memorize', desc: 'Verses and catechism', icon: 'book' },
+  { id: 'listen', name: 'Listen', desc: 'Hear questions and answers', icon: 'headphones' },
 ];
 
 function goHome(keepScroll) {

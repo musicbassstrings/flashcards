@@ -633,7 +633,7 @@ function pickPuzzle(card) {
 
 MODES.dunk = function () {
   const base = needCards(1, 'Dunk Tank'); if (!base) return;
-  const s = screen({ title: 'Dunk Tank', noProgress: true });
+  const s = screen({ title: 'Dunk Tank', noProgress: true, cls: 'compact' });
   let order = prioritize(base), idx = 0, run = 0, guessFn = null;
   const onKey = e => { if (guessFn && /^[a-z]$/i.test(e.key) && !e.metaKey && !e.ctrlKey) guessFn(e.key.toLowerCase()); };
   document.addEventListener('keydown', onKey);
@@ -655,10 +655,19 @@ MODES.dunk = function () {
     const balls = h('div', { class: 'balls', 'aria-label': 'Balls thrown' });
     const paintBalls = () => balls.replaceChildren(...Array.from({ length: DUNK_MAX }, (_, i) => h('span', { class: 'b' + (i < misses ? ' used' : '') })));
     const puzzle = h('div', { class: 'puzzle' + (pz.whole ? '' : ' ctx') });
+    // For long answers, show only a few words on each side of the blank.
+    let winA = 0, winB = pz.text.length;
+    if (!pz.whole) {
+      winA = Math.max(0, pz.start - 50); winB = Math.min(pz.text.length, pz.end + 50);
+      if (winA > 0) { const sp = pz.text.indexOf(' ', winA); winA = sp >= 0 && sp < pz.start ? sp + 1 : pz.start; }
+      if (winB < pz.text.length) { const sp = pz.text.lastIndexOf(' ', winB); winB = sp > pz.end ? sp : pz.end; }
+    }
     function paintPuzzle() {
       const parts = []; let i = 0;
+      if (winA > 0) parts.push(h('span', { class: 'ctx-ch' }, '… '));
       for (const tok of pz.text.split(/(\s+)/)) {
         if (!tok) continue;
+        if (i + tok.length <= winA || i >= winB) { i += tok.length; continue; }
         if (/^\s+$/.test(tok)) { parts.push(' '); i += tok.length; continue; }
         const word = h('span', { class: 'pw' });
         for (const ch of tok) {
@@ -670,13 +679,15 @@ MODES.dunk = function () {
         }
         parts.push(word);
       }
+      if (winB < pz.text.length) parts.push(h('span', { class: 'ctx-ch' }, ' …'));
       puzzle.replaceChildren(...parts);
     }
     const msg = h('p', { class: 'dunk-msg' }, `Guess the ${pz.whole ? 'answer' : 'missing word'} one letter at a time. ${DUNK_MAX} misses and he gets dunked!`);
-    const kb = h('div', { class: 'kb' }, 'abcdefghijklmnopqrstuvwxyz'.split('').map(l => {
-      const b = h('button', { type: 'button', class: 'key' }, l.toUpperCase());
-      b.onclick = () => guess(l); keys[l] = b; return b;
-    }));
+    const kb = h('div', { class: 'kb' }, ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].map(row =>
+      h('div', { class: 'kb-row' }, row.split('').map(l => {
+        const b = h('button', { type: 'button', class: 'key', 'aria-label': 'Letter ' + l.toUpperCase() }, l.toUpperCase());
+        b.onclick = () => guess(l); keys[l] = b; return b;
+      }))));
     const actions = h('div', { class: 'row-btns' }, h('button', { class: 'btn ghost', type: 'button', onclick: () => lose(true) }, 'Give up'));
 
     function guess(l) {
@@ -713,6 +724,7 @@ MODES.dunk = function () {
       over = true; guessFn = null; run++;
       if (run > best) { P.best['max:dunk'] = run; }
       recordResult(c.id, true);
+      showArt();
       svg.classList.add('cheer');
       s.count(`${run} in a row`);
       msg.replaceChildren(h('b', { class: 'ok-text' }, 'Safe and dry!'), ` ${run > 1 ? `That's ${run} in a row.` : ''}${run > best && best ? ' New record!' : ''}`);
@@ -724,18 +736,24 @@ MODES.dunk = function () {
       over = true; guessFn = null; run = 0;
       recordResult(c.id, false);
       paintPuzzle();
-      svg.classList.add('dunked');
+      showArt();
+      setTimeout(() => svg.classList.add('dunked'), 150);
       s.count('');
       msg.replaceChildren(h('b', { class: 'bad-text' }, 'SPLASH!'), gaveUp ? ' He went in anyway. The answer is shown above.' : ' The answer is shown above.');
       actions.replaceChildren(btn('Next card', game, 'primary big'));
       kb.classList.add('done');
     }
+    // Make sure the tank is on screen when he cheers or goes in the water.
+    function showArt() {
+      const r = art.getBoundingClientRect();
+      if (r.top < 60 || r.bottom > window.innerHeight) art.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     guessFn = guess;
     paintBalls(); paintPuzzle();
     s.set([
       h('div', { class: 'prompt dunk-clue' }, h('div', { class: 'prompt-top' }, catTag(c), h('span', { class: 'grow' }), speakBtn(pz.clue), starBtn(c.id)),
-        h('div', { class: 'prompt-text t-' + textSize(pz.clue) }, pz.clue)),
-      art, balls, puzzle, msg, kb, actions,
+        h('div', { class: 'prompt-text dunk-clue-text' }, pz.clue)),
+      h('div', { class: 'dunk-stage' }, art, balls), puzzle, msg, kb, actions,
       best ? h('p', { class: 'muted center small' }, `Best run: ${best} in a row`) : null]);
   }
   game();
@@ -838,4 +856,270 @@ MODES.memorize = function () {
     setTimeout(() => input.focus(), 60);
   }
   view();
+};
+
+/* ---------------- Hungry Fish (fill in the blank) ---------------- */
+const FISH_SVG = `
+<svg viewBox="0 0 64 40" class="fish-svg" aria-hidden="true">
+  <path d="M3 7 L17 20 L3 33 Z" class="fish-tail"/>
+  <ellipse cx="32" cy="20" rx="20" ry="14" class="fish-body"/>
+  <path d="M25 8 Q33 0 41 8" class="fish-fin"/>
+  <path d="M26 24 Q31 30 36 25" class="fish-fin2"/>
+  <circle cx="42" cy="14" r="3.6" fill="#fff"/><circle cx="43" cy="14" r="1.8" fill="#1d1d1d"/>
+  <path d="M49 20 L60 12.5 L60 27.5 Z" class="fish-mouth"/>
+</svg>`;
+
+function wordBankFor(cards) {
+  const set = new Map();
+  cards.forEach(c => sides(c).back.split(/\s+/).forEach(w => {
+    const core = w.replace(/^[^A-Za-z0-9']+|[^A-Za-z0-9']+$/g, '');
+    if (core.replace(/'/g, '').length >= 3 && !set.has(core.toLowerCase())) set.set(core.toLowerCase(), core);
+  }));
+  return [...set.values()];
+}
+function matchCase(w, model) {
+  if (/^[A-Z][a-z]/.test(model)) return w[0].toUpperCase() + w.slice(1);
+  if (/^[a-z]/.test(model) && /^[A-Z][a-z]/.test(w)) return w[0].toLowerCase() + w.slice(1);
+  return w;
+}
+// Picks one word of the answer to blank out, plus three look-alike wrong choices.
+function pickBlank(card, bank) {
+  const { front, back } = sides(card);
+  const toks = back.split(/(\s+)/);
+  const cands = [];
+  toks.forEach((t, i) => {
+    const m = t.match(/^([^A-Za-z0-9]*)([A-Za-z0-9](?:[A-Za-z0-9'-]*[A-Za-z0-9])?)([^A-Za-z0-9]*)$/);
+    if (m && m[2].replace(/'/g, '').length >= 4 && !STOP.has(m[2].toLowerCase())) cands.push({ i, lead: m[1], word: m[2], tail: m[3] });
+  });
+  const wordCount = toks.filter(t => t.trim()).length;
+  const whole = () => ({ clue: front, before: '', after: '', answer: back, whole: true, choices: shuffle([back].concat(distractors(card, 3))) });
+  if (wordCount <= 3 || !cands.length) return whole();
+  const longer = cands.filter(c => c.word.length >= 5);
+  const pc = pick(longer.length ? longer : cands), answer = pc.word, low = answer.toLowerCase();
+  const isNum = /^\d+$/.test(answer), seen = new Set([low]), ds = [];
+  for (const w of shuffle(bank)) {
+    const k = w.toLowerCase();
+    if (seen.has(k) || /^\d+$/.test(w) !== isNum || Math.abs(w.length - answer.length) > 3) continue;
+    seen.add(k); ds.push(matchCase(w, answer));
+    if (ds.length >= 3) break;
+  }
+  if (!ds.length) return whole();
+  let before = toks.slice(0, pc.i).join('') + pc.lead, after = pc.tail + toks.slice(pc.i + 1).join('');
+  if (before.length > 70) before = '… ' + before.slice(before.indexOf(' ', before.length - 70) + 1);
+  if (after.length > 70) after = after.slice(0, after.lastIndexOf(' ', 70)) + ' …';
+  return { clue: front, before, after, answer, whole: false, choices: shuffle([answer].concat(ds)) };
+}
+
+MODES.chomp = function () {
+  const base = needCards(2, 'Hungry Fish'); if (!base) return;
+  const s = screen({ title: 'Hungry Fish', noProgress: true, cls: 'compact' });
+  const DOTS = 10, LIVES = 3, bank = wordBankFor(Cards.list);
+  let order = prioritize(base), idx = 0, level = 1, eaten = 0, lives = LIVES, score = 0, keyFn = null, dots = [];
+  const onKey = e => { if (keyFn && /^[1-4]$/.test(e.key)) keyFn(+e.key - 1); };
+  document.addEventListener('keydown', onKey);
+  onCleanup(() => document.removeEventListener('keydown', onKey));
+
+  const dotX = i => 15 + i * 9; // percent across the track
+  const hud = h('div', { class: 'chomp-hud' });
+  const fish = h('div', { class: 'fish', html: FISH_SVG });
+  const track = h('div', { class: 'chomp-track' });
+  const area = h('div', { class: 'chomp-area' });
+  s.set([hud, track, area]);
+
+  function paintHud() {
+    s.count(`Level ${level}`);
+    hud.replaceChildren(
+      h('span', { class: 'hearts', 'aria-label': `${lives} of ${LIVES} lives left` }, '♥'.repeat(lives), h('span', { class: 'lost' }, '♥'.repeat(LIVES - lives))),
+      h('span', null, `Dots ${eaten}/${DOTS}`),
+      h('span', null, `Score ${score}`));
+  }
+  function placeFish() { fish.style.left = eaten === 0 ? '4px' : `calc(${dotX(eaten - 1)}% - 46px)`; }
+  function resetTrack() {
+    eaten = 0;
+    dots = Array.from({ length: DOTS }, (_, i) => h('span', { class: 'dot', style: { left: dotX(i) + '%' } }));
+    track.replaceChildren(...dots, fish);
+    placeFish(); paintHud();
+  }
+  function bump(cls) { fish.classList.remove(cls); void fish.offsetWidth; fish.classList.add(cls); }
+
+  function question() {
+    if (idx >= order.length) { order = prioritize(base); idx = 0; }
+    const c = order[idx++], pz = pickBlank(c, bank);
+    let answered = false;
+    const blank = h('span', { class: 'blank' }, ' ');
+    const sentence = pz.whole
+      ? h('div', { class: 'chomp-sentence whole' }, blank)
+      : h('div', { class: 'chomp-sentence' }, pz.before, blank, pz.after);
+    const fb = h('div', { class: 'feedback' });
+    const btns = pz.choices.map((ch, i) => {
+      const b = h('button', { type: 'button', class: 'choice chomp-choice' + (pz.whole ? ' t-' + textSize(ch) : '') }, ch);
+      b.onclick = () => choose(i);
+      return b;
+    });
+    function choose(i) {
+      if (answered || i >= btns.length) return;
+      answered = true; keyFn = null;
+      const ok = pz.choices[i] === pz.answer;
+      btns.forEach((b, k) => { b.disabled = true; if (pz.choices[k] === pz.answer) b.classList.add('right'); });
+      blank.textContent = pz.answer; blank.classList.add(ok ? 'ok' : 'bad');
+      recordResult(c.id, ok);
+      if (ok) {
+        score++; eaten++;
+        const d = dots[eaten - 1];
+        placeFish();
+        setTimeout(() => { bump('chomp'); d.classList.add('eaten'); }, 380);
+        paintHud();
+        setTimeout(eaten >= DOTS ? levelDone : question, 1150);
+      } else {
+        btns[i].classList.add('wrong');
+        lives--; paintHud(); bump('hurt');
+        fb.replaceChildren(
+          h('div', { class: 'fb bad' }, lives ? `Not quite. ${lives} ${lives === 1 ? 'heart' : 'hearts'} left.` : 'Out of hearts!'),
+          btn(lives ? 'Continue' : 'See score', lives ? question : gameOver));
+      }
+    }
+    keyFn = choose;
+    area.replaceChildren(
+      h('div', { class: 'prompt dunk-clue' },
+        h('div', { class: 'prompt-top' }, catTag(c), h('span', { class: 'grow' }), speakBtn(pz.clue), starBtn(c.id)),
+        h('div', { class: 'prompt-text dunk-clue-text' }, pz.clue)),
+      sentence,
+      h('div', { class: 'chomp-choices' + (pz.whole ? ' whole' : '') }, btns),
+      fb);
+  }
+  function levelDone() {
+    if (lives < LIVES) lives++;
+    paintHud();
+    area.replaceChildren(resultPanel({
+      big: '★', title: `Level ${level} cleared!`,
+      sub: `The fish ate all ${DOTS} dots.` + (lives === LIVES ? '' : ' You got a heart back.'),
+      buttons: [btn(`Start level ${level + 1}`, () => { level++; resetTrack(); question(); }, 'primary big')],
+    }));
+  }
+  function gameOver() {
+    const best = P.best['max:chomp'] || 0, record = score > best;
+    if (record) { P.best['max:chomp'] = score; touchDay(); saveProgress(); }
+    s.count('');
+    area.replaceChildren(resultPanel({
+      big: String(score), title: record && best ? 'New high score!' : 'Game over',
+      sub: `You reached level ${level}.` + (best && !record ? ` Your best score is ${best}.` : ''),
+      buttons: [btn('Play again', () => MODES.chomp(), 'primary big'), btn('Back home', () => goHome(), 'ghost')],
+    }));
+  }
+  resetTrack();
+  question();
+};
+
+/* ---------------- Listen (audio) ---------------- */
+MODES.listen = function () {
+  const base = needCards(1, 'Listen'); if (!base) return;
+  if (!('speechSynthesis' in window)) return toast('Audio is not available on this device');
+  const s = screen({ title: 'Listen' });
+  const L = Object.assign({ rate: 1, pause: 4, order: 'sheet', twice: false, answerOnly: false }, LS.get('ff.listen', {}));
+  const saveL = () => LS.set('ff.listen', L);
+  let list = makeList(), i = 0, playing = false, token = 0, timer = null, lock = null, counted = false;
+  function makeList() { return L.order === 'shuffle' ? shuffle(base) : L.order === 'hard' ? prioritize(base) : base.slice(); }
+
+  function voice() {
+    const vs = speechSynthesis.getVoices().filter(v => /^en[-_]US/i.test(v.lang));
+    return vs.find(v => /samantha|ava|allison|aaron|google us english/i.test(v.name)) || vs.find(v => v.localService) || vs[0] || null;
+  }
+  function say(text) {
+    return new Promise(res => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = L.rate; u.lang = 'en-US';
+      const v = voice(); if (v) u.voice = v;
+      let done = false;
+      const fin = () => { if (!done) { done = true; clearTimeout(t); res(); } };
+      const t = setTimeout(fin, 5000 + text.length * 120 / L.rate); // in case the end event never arrives
+      u.onend = fin; u.onerror = fin;
+      speechSynthesis.speak(u);
+    });
+  }
+  const wait = ms => new Promise(r => { timer = setTimeout(r, ms); });
+  async function keepAwake(on) {
+    try {
+      if (on && !lock && 'wakeLock' in navigator) lock = await navigator.wakeLock.request('screen');
+      if (!on && lock) { await lock.release(); lock = null; }
+    } catch (e) { /* not supported */ }
+  }
+
+  const tag = h('div', { class: 'prompt-top' });
+  const qText = h('div', { class: 'prompt-text' });
+  const aText = h('div', { class: 'answer-text listen-answer' });
+  const card = h('div', { class: 'study-card listen-card' }, tag, h('div', { class: 'prompt-label' }, 'Question'), qText, h('div', { class: 'divider' }), h('div', { class: 'prompt-label' }, 'Answer'), aText);
+  const playBtn = h('button', { class: 'round-btn play', type: 'button', 'aria-label': 'Play', onclick: () => (playing ? stop() : run()) });
+  const prevBtn = h('button', { class: 'round-btn ghost', type: 'button', 'aria-label': 'Previous card', onclick: () => jump(-1) }, icon('left'));
+  const nextBtn = h('button', { class: 'round-btn ghost', type: 'button', 'aria-label': 'Next card', onclick: () => jump(1) }, icon('right'));
+
+  function showCard(revealed) {
+    const c = list[i], sd = sides(c);
+    s.progress(i, Math.max(1, list.length - 1)); s.count(`${i + 1} / ${list.length}`);
+    tag.replaceChildren(catTag(c), h('span', { class: 'grow' }), starBtn(c.id));
+    qText.className = 'prompt-text t-' + textSize(sd.front); qText.textContent = sd.front;
+    aText.className = 'answer-text listen-answer t-' + textSize(sd.back) + (revealed ? '' : ' veiled');
+    aText.textContent = sd.back;
+  }
+  function paintControls() {
+    playBtn.replaceChildren(icon(playing ? 'pause' : 'play'));
+    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    prevBtn.disabled = i === 0; nextBtn.disabled = i >= list.length - 1;
+  }
+  async function run() {
+    const my = ++token;
+    playing = true; paintControls(); keepAwake(true);
+    if (!counted) { counted = true; touchDay(); saveProgress(); }
+    while (my === token) {
+      const sd = sides(list[i]);
+      showCard(L.answerOnly);
+      for (let r = 0; r < (L.twice ? 2 : 1); r++) {
+        if (!L.answerOnly) {
+          if (r) showCard(false);
+          await say(sd.front); if (my !== token) return;
+          await wait(L.pause * 1000); if (my !== token) return;
+        }
+        showCard(true);
+        await say(sd.back); if (my !== token) return;
+        await wait(1500); if (my !== token) return;
+      }
+      if (i >= list.length - 1) { stop(); toast('Finished the list'); return; }
+      i++;
+    }
+  }
+  function stop() {
+    token++; playing = false;
+    clearTimeout(timer);
+    try { speechSynthesis.cancel(); } catch (e) { }
+    keepAwake(false); paintControls();
+  }
+  function jump(d) {
+    const was = playing;
+    stop();
+    i = Math.max(0, Math.min(list.length - 1, i + d));
+    showCard(false); paintControls();
+    if (was) setTimeout(run, 150);
+  }
+  function seg(label, key, opts, after) {
+    const box = h('div', { class: 'seg' });
+    const draw = () => box.replaceChildren(...opts.map(([v, t]) => h('button', {
+      type: 'button', class: 'seg-btn' + (L[key] === v ? ' on' : ''),
+      onclick: () => { L[key] = v; saveL(); draw(); if (after) after(); },
+    }, t)));
+    draw();
+    return [h('p', { class: 'label' }, label), box];
+  }
+  const restart = () => { stop(); list = makeList(); i = 0; showCard(false); paintControls(); };
+
+  onCleanup(stop);
+  s.set([
+    card,
+    h('div', { class: 'fc-controls' }, prevBtn, playBtn, nextBtn),
+    seg('Speed', 'rate', [[0.75, 'Slow'], [1, 'Normal'], [1.25, 'Fast']]),
+    seg('Pause before the answer', 'pause', [[2, '2 sec'], [4, '4 sec'], [7, '7 sec']]),
+    seg('Order', 'order', [['sheet', 'In order'], ['shuffle', 'Shuffle'], ['hard', 'Hardest first']], restart),
+    h('div', { class: 'options' },
+      toggleRow('Read each card twice', L.twice, v => { L.twice = v; saveL(); }),
+      toggleRow('Read answers only', L.answerOnly, v => { L.answerOnly = v; saveL(); }, 'Good for listening to verses or the catechism straight through')),
+    h('p', { class: 'muted small center' }, 'Tip: keep this screen open. iPhone stops reading aloud if you lock the phone or switch apps.')]);
+  showCard(false); paintControls();
 };
